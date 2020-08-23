@@ -1,0 +1,98 @@
+#inport correct libraries 
+import boto3
+
+#Define environment variables
+global regionName
+regionName = ''
+secretKey = ''
+accessKey = ''
+
+#Get login info from txt file in same directory
+def parceTxt(rawLine): 
+    locEqual = rawLine.find('=')
+    length = len(rawLine)
+    cleanLine = rawLine[locEqual+1:length]
+    cleanLine = cleanLine.strip()
+    return cleanLine
+
+def getLoginInfo():
+    lineNbr = 1
+    with open('loginInfo.txt','r') as openFile: 
+        regionName = parceTxt(openFile.readline())
+        secretKey = parceTxt(openFile.readline())
+        accessKey = parceTxt(openFile.readline())
+        secureInfo = [regionName,secretKey,accessKey]
+    return secureInfo
+
+def connectToAws(creds):
+    
+    boto3.setup_default_session(
+    aws_access_key_id=creds[2],
+    aws_secret_access_key=creds[1],
+    region_name=creds[0])
+
+    clientConnect = boto3.client('ec2')
+    resourceConnect = boto3.resource('ec2')
+    print("1. Successfully connected to AWS")
+    
+    return [clientConnect,resourceConnect]
+
+def createVPC(connectionAWS):
+    resourceEC2 = connectionAWS[1] 
+    newVpc = resourceEC2.create_vpc(CidrBlock='10.10.0.0/16')
+    name = input("Enter the name of the VPC  ")
+    newVpc.create_tags(Tags=[{"Key": "Name", "Value": name}])
+    print("2. Created VPN {}".format(name))
+    publicSubnet =  createSubnet(connectionAWS,newVpc.id)
+    print("3. Created Public Subnet")
+    privateSubnet = 0 #createSubnet(connectionAWS,newVpc.id)
+    print("4. Created Private Subnet")
+    InternetGateway = createInternetGateway(connectionAWS,newVpc.id)
+    print("5. Created Internet Gateway")
+    elasticIP = createElasticIP(connectionAWS,newVpc.id)
+    print("6. Created ElasticIP")
+    NATGateway = createNATGateway(connectionAWS,publicSubnet.subnet_id,elasticIP['AllocationId'])
+    print("7. Created NAT Gateway")
+    return [newVpc,publicSubnet, privateSubnet, InternetGateway, elasticIP]
+
+def createSubnet(connectionAWS,identifier):
+    clientEC2 = connectionAWS[0]
+    response = clientEC2.create_subnet(
+        VpcId=identifier ,
+        CidrBlock='10.10.1.0/24'
+    )
+    #Return the object
+    subnetId = response['Subnet']['SubnetId'] 
+    subnetObj = connectionAWS[1].Subnet(subnetId)
+    return subnetObj
+
+def createInternetGateway(connectionAWS,identifier): 
+    #Creates an internet gateways (Allows VPC to communicate with the public internet) 
+    resourceEC2 = connectionAWS[1]
+    internetGateway = resourceEC2.create_internet_gateway()
+    #Assigns it to a VPC
+    internetGateway.attach_to_vpc(
+        VpcId = identifier
+    )
+
+    #Returns the IGW
+    return createInternetGateway
+
+def createElasticIP(connectionAWS,identifier):
+    #Reserve a public IP address for your VPC
+    newElasticIP = connectionAWS[0].allocate_address(Domain = 'vpc')
+    return newElasticIP
+
+def createNATGateway(connectionAWS,publicSubnetID,allocationID):
+    #Creates a NAT Gatway on the Public Subnet to send outbound traffic to internet
+    newNATGatway = connectionAWS[0].create_nat_gateway(SubnetId = publicSubnetID, AllocationId = allocationID)
+    return newNATGatway
+
+if __name__ == "__main__":
+    creds = getLoginInfo()
+    connectionsAWS = connectToAws(creds)
+    objList = createVPC(connectionsAWS)
+    print(objList)
+
+
+

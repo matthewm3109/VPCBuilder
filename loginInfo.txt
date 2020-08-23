@@ -1,0 +1,5 @@
+regionName=(enter region here - eg.us-east-1)
+secretKey=(enter secret key here)
+accessKey=(enter access key here)
+
+
