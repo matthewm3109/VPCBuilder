@@ -129,6 +129,11 @@ def returnDefaultACL(connectionAWS, identifier):
     for nacl in naclIterable: 
         if nacl.is_default == True: 
             print('9. Default Network ACL Found')
+            entriesList = nacl.entries
+            #an entry is the rule itself 
+            for entry in entriesList: 
+                #The return obj is a dict. If the Egress element is false, then it is an Inbound rule 
+                print(' |_ Existing entry: {}'.format(entry))
             return nacl 
 
 if __name__ == "__main__":
