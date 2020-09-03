@@ -60,6 +60,7 @@ def createVPC(connectionAWS):
     NATGateway = createNATGateway(connectionAWS,publicSubnet.subnet_id,elasticIP['AllocationId'])
     print("7. Successfully created NAT Gateway")
     routeTables = returnRouteTable(connectionAWS,newVpc.id)
+    defaultNacl = returnDefaultACL(connectionAWS,newVpc.id)
     return {
     'VPC: '                 :newVpc,
     'Public Subnet: '       :publicSubnet, 
@@ -67,7 +68,8 @@ def createVPC(connectionAWS):
     'Internet Gateway: '    :InternetGateway, 
     'Elastic IP: '          :elasticIP, 
     'NAT Gateway: '         :NATGateway,
-    'RouteTables: '         :routeTables
+    'RouteTables: '         :routeTables,
+    'Network ACL: '         :defaultNacl
     }
 
 def createSubnet(connectionAWS,identifier,thirdOctet):
@@ -111,10 +113,24 @@ def returnRouteTable(connectionAWS, identifier):
     defaultRouteTable = myVpc.route_tables.all()
     for routeTable in defaultRouteTable: 
         print('8. Route table found. Id = ' + routeTable.id)
+        #Direct outbound traffic to the internet gateway 
+        for routes in routeTable.routes: 
+            #Default route table allows for communication within VPC
+            print(' |_ Existing route: {}'.format(routes))
         return routeTable
     print ('8. No Default Route table found')
     return None 
     
+def returnDefaultACL(connectionAWS, identifier):
+    #ACL is a stateless firefall
+    #one is created by default that allows all inbound/outbound traffic
+    myVpc = connectionAWS[1].Vpc(identifier)
+    naclIterable = myVpc.network_acls.all()
+    for nacl in naclIterable: 
+        if nacl.is_default == True: 
+            print('9. Default Network ACL Found')
+            return nacl 
+
 if __name__ == "__main__":
     creds = getLoginInfo()
     connectionsAWS = connectToAws(creds)
